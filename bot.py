@@ -180,10 +180,12 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @app.route('/')
 async def webhook():
     """Handle incoming Telegram updates"""
+    print('hello')
 
     if flask.request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), telebot.bot)
+        update = Update.de_json(flask.request.get_json(force=True), telebot.bot)
         await telebot.process_update(update)
+
         return "OK", 200
     else:
         return "Hello", 200
@@ -191,11 +193,12 @@ async def webhook():
 async def setup_webhook():
     """Set the webhook with Telegram on startup"""
     async with telebot:
-        await telebot.bot.set_webhook(url=telebot)
+        await telebot.bot.set_webhook(url=WEBHOOK_URL)
         print(f"Webhook set to {WEBHOOK_URL}")
 
 def main() -> None:
     """Start the bot."""
+    asyncio.run(setup_webhook())
     # Create the Application and pass it your bot's token.
 
     # on different commands - answer in Telegram
@@ -213,7 +216,6 @@ def main() -> None:
 
     # Run the bot until the user presses Ctrl-C
     # telebot.run_polling(allowed_updates=Update.ALL_TYPES)
-    asyncio.run(setup_webhook())
 
 if __name__ == "__main__":
     main()
