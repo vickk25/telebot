@@ -177,10 +177,9 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"
     )
 
-@app.route('/', methods=['POST'])
+@app.route('/', methods=['GET', 'POST'])
 async def webhook():
     """Handle incoming Telegram updates"""
-    print('hello')
 
     if flask.request.method == "POST":
         update = Update.de_json(flask.request.get_json(force=True), telebot.bot)
