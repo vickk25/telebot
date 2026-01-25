@@ -16,7 +16,7 @@ bot.
 """
 
 import asyncio
-from flask import Flask, request
+
 
 import requests
 import logging
@@ -25,8 +25,10 @@ from telegram import *
 from telegram.ext import *
 from random import *
 import random
+import flask
 
-app = Flask(__name__)
+
+app = flask.Flask(__name__)
 
 WEBHOOK_URL = 'https://telebot-sepia.vercel.app/'
 TOKEN = "8227179644:AAGd2SegWXWiMZ0KlYKhYtI5npopw6n12Vs"
@@ -179,7 +181,7 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def webhook():
     """Handle incoming Telegram updates"""
 
-    if request.method == "POST":
+    if flask.request.method == "POST":
         update = Update.de_json(request.get_json(force=True), telebot.bot)
         await telebot.process_update(update)
         return "OK", 200
