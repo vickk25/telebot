@@ -16,6 +16,7 @@ bot.
 """
 
 import asyncio
+from turtle import update
 
 
 import requests
@@ -45,40 +46,36 @@ telebot = (
 # context.
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
-    # # menu = [
-    # #     [InlineKeyboardButton("Random Cat image", callback_data='cat')],
-    # #     [InlineKeyboardButton("Random Joke", callback_data="joke")],
-    # #     [InlineKeyboardButton("Rock Paper Scissors", callback_data="rps")]
-    #     ]
+    menu = [
+        [InlineKeyboardButton("Random Cat image", callback_data='cat')],
+        [InlineKeyboardButton("Random Joke", callback_data="joke")],
+        [InlineKeyboardButton("Rock Paper Scissors", callback_data="rps")] 
+        ]
+    
     user = update.effective_user
+    # await update.message.reply_html(
+    #     rf"Hi {user.mention_html()}! Choose a function:",
+    #     # reply_markup= InlineKeyboardMarkup(menu)
+    #     reply_markup=ForceReply(selective=True),
+    # )
+
     await update.message.reply_html(
-        rf"Hi {user.mention_html()}! Choose a function:",
-        # reply_markup= InlineKeyboardMarkup(menu)
-        reply_markup=ForceReply(selective=True),
-    )
+        f"Hi {user.mention_html()}! Choose a function 👇",
+        reply_markup=InlineKeyboardMarkup(menu),
+    ) 
 
-    # async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    #     query = update.callback_query
-    #     await query.answer()
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
 
-    #     if query.data == 'cat':
-    #         await query.edit_message_media(f'Here is a random cat image: {cat}')
+    if query.data == 'cat':
+        await query.edit_message_media(f'Here is a random cat image: {cat}')
 
-    #     elif query.data == 'joke':
-    #         await query.edit_message_text(f'Here is a random joke: {joke}')
+    elif query.data == 'joke':
+        await query.edit_message_text(f'Here is a random joke: {joke}')
 
-    #     elif query.data == 'rps':
-    #         await query.edit_message_text({rps_play})
-
-    # async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /help is issued."""
-    # await update.message.reply_text("Help!")
-
-
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Echo the user message."""
-    await update.message.reply_text(update.message.text)
-
+    elif query.data == 'rps':
+        await query.edit_message_text({rps_play})
 
 async def cat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends random cat image."""
@@ -88,7 +85,13 @@ async def cat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     data = resp.json()
     cat_image_url = data[0]["url"]
 
-    await update.message.reply_photo(photo=cat_image_url)
+    #await update.message.reply_photo(photo=cat_image_url)
+
+    if update.message:
+       await update.message.reply_photo(photo=cat_image_url)
+    elif update.callback_query:
+       await update.callback_query.answer()
+       await update.callback_query.message.reply_photo(photo=cat_image_url)
 
 
 async def joke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -205,7 +208,9 @@ def main() -> None:
 
     asyncio.run(setup_webhook())
     telebot.add_handler(CommandHandler("start", start))
+    telebot.add_handler(CallbackQueryHandler(button_callback))
     telebot.add_handler(CommandHandler("cat", cat))
+    telebot.add_handler(CallbackQueryHandler(cat, pattern="^cat_"))
     telebot.add_handler(CommandHandler("joke", joke))
     telebot.add_handler(CallbackQueryHandler(joke_callback_handler, pattern="^joke_"))
     telebot.add_handler(CommandHandler("rps", rps_start))
