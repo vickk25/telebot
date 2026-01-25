@@ -39,6 +39,8 @@ telebot = (
     .build()
 )
 
+
+
 # Define a few command handlers. These usually take the two arguments update and
 # context.
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -181,7 +183,9 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def webhook():
     """Handle incoming Telegram updates"""
 
+    telebot.add_handler(CommandHandler("start", start))
     if flask.request.method == "POST":
+        await telebot.initialize()
         update = Update.de_json(flask.request.get_json(force=True), telebot.bot)
         await telebot.process_update(update)
 
@@ -201,7 +205,7 @@ def main() -> None:
     # Create the Application and pass it your bot's token.
 
     # on different commands - answer in Telegram
-    telebot.add_handler(CommandHandler("start", start))
+
     # application.add_handler(CallbackQueryHandler(button_callback))
     # application.add_handler(CommandHandler("help", help_command))
     telebot.add_handler(CommandHandler("cat", cat))
