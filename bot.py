@@ -16,11 +16,8 @@ bot.
 """
 
 import asyncio
-from turtle import update
-
 
 import requests
-import logging
 
 from telegram import *
 from telegram.ext import *
