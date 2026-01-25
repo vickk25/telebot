@@ -177,7 +177,7 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"
     )
 
-@app.route('/')
+@app.route('/', methods=['POST'])
 async def webhook():
     """Handle incoming Telegram updates"""
     print('hello')
