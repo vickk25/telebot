@@ -43,11 +43,11 @@ telebot = (
 # context.
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
-    menu = [
-        [InlineKeyboardButton("Random Cat image", callback_data='cat')],
-        [InlineKeyboardButton("Random Joke", callback_data="joke")],
-        [InlineKeyboardButton("Rock Paper Scissors", callback_data="rps")] 
-        ]
+    # menu = [
+    #     [InlineKeyboardButton("Random Cat image", callback_data='cat')],
+    #     [InlineKeyboardButton("Random Joke", callback_data="joke")],
+    #     [InlineKeyboardButton("Rock Paper Scissors", callback_data="rps")] 
+    #     ]
     
     user = update.effective_user
     # await update.message.reply_html(
@@ -56,9 +56,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     #     reply_markup=ForceReply(selective=True),
     # )
 
+    reply_keyboard = [
+        ['/joke', '/cat'],
+        ['/rps']
+    ]
+    markup_request = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
+
     await update.message.reply_html(
         f"Hi {user.mention_html()}! Choose a function 👇",
-        reply_markup=InlineKeyboardMarkup(menu),
+        reply_markup=markup_request,
     ) 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
