@@ -10,6 +10,7 @@ from telegram import (
     InlineKeyboardMarkup, 
     ReplyKeyboardMarkup, 
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application, 
     CommandHandler, 
@@ -25,6 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 2. Configuration
+# Try to get TOKEN from Environment Variable, fallback to your string for local testing if needed
 TOKEN = os.getenv("BOT_TOKEN", "8535828230:AAF71_itHUM4_SzdLXUdneTUCgm_Ba69444") 
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://telebot-sepia.vercel.app/")
 
@@ -38,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Persistent keyboard (at the bottom of chat)
     reply_keyboard = [
         ['/joke', '/cat'],
-        ['/rps']
+        ['/rps', '/math']
     ]
     markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
@@ -56,20 +58,13 @@ async def cat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         data = resp.json()
         cat_image_url = data[0]["url"]
 
-        # Handle both command calls and callback queries
-        if update.callback_query:
-            await update.callback_query.answer()
-            await update.callback_query.message.reply_photo(photo=cat_image_url)
-        elif update.message:
+        if update.message:
             await update.message.reply_photo(photo=cat_image_url)
             
     except Exception as e:
         logger.error(f"Error fetching cat: {e}")
-        text = "Sorry, couldn't find a cat right now."
-        if update.callback_query:
-            await update.callback_query.message.reply_text(text)
-        else:
-            await update.message.reply_text(text)
+        if update.message:
+            await update.message.reply_text("Sorry, couldn't find a cat right now.")
 
 async def joke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Fetches a random joke setup."""
@@ -83,7 +78,6 @@ async def joke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         punchline = data["punchline"]
 
         # Note: Callback data has a 64-byte limit. Long punchlines might fail here.
-        # Ideally, store the ID and fetch later, but for simple bots, this works if short.
         keyboard = [[InlineKeyboardButton("Reveal", callback_data=f"joke_{punchline}")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -100,6 +94,87 @@ async def joke_reveal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Extract punchline from callback_data (format: "joke_PUNCHLINE")
     punchline = query.data.split("joke_", 1)[1]
     await query.edit_message_text(punchline)
+
+# --- Math Battle Logic ---
+async def generate_math_problem():
+    """Helper to generate question and keyboard."""
+    ops = ['+', '-', '*']
+    op = random.choice(ops)
+    
+    if op == '*':
+        a = random.randint(2, 12)
+        b = random.randint(2, 12)
+    else:
+        a = random.randint(1, 50)
+        b = random.randint(1, 50)
+        
+    question = f"{a} {op} {b}"
+    answer = eval(question)
+    
+    choices = {answer}
+    while len(choices) < 4:
+        offset = random.randint(-10, 10)
+        if offset != 0:
+            choices.add(answer + offset)
+    
+    choices_list = list(choices)
+    random.shuffle(choices_list)
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(str(choices_list[0]), callback_data=f"math_ans_{choices_list[0]}_{answer}"),
+            InlineKeyboardButton(str(choices_list[1]), callback_data=f"math_ans_{choices_list[1]}_{answer}")
+        ],
+        [
+            InlineKeyboardButton(str(choices_list[2]), callback_data=f"math_ans_{choices_list[2]}_{answer}"),
+            InlineKeyboardButton(str(choices_list[3]), callback_data=f"math_ans_{choices_list[3]}_{answer}")
+        ]
+    ]
+    return f"🧠 **Math Battle** 🧠\n\nSolve this:\n`{question} = ?`", InlineKeyboardMarkup(keyboard)
+
+async def math_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates a math problem and 4 options."""
+    text, reply_markup = await generate_math_problem()
+    
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        await update.message.reply_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
+
+async def math_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Checks the answer. If correct, immediately gives a new question."""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data.split("_")
+    selected = int(data[2])
+    actual = int(data[3])
+    
+    if selected == actual:
+        # Correct! Generate new question immediately for continuous play
+        text, reply_markup = await generate_math_problem()
+        # Add a small success indicator to the top of the next question
+        new_text = f"✅ **Correct!**\n\n{text}"
+        await query.edit_message_text(
+            new_text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        # Wrong! End the streak and show play again button
+        result_text = f"❌ **Wrong!**\nYou chose {selected}. The answer was {actual}."
+        keyboard = [[InlineKeyboardButton("🔄 Try Again", callback_data="math_start")]]
+        
+        await query.edit_message_text(
+            result_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
 
 # --- Rock Paper Scissors Logic ---
 def get_winner(user_choice: str, bot_choice: str) -> str:
@@ -165,15 +240,16 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # 4. Initialize Application
-# We create a global bot app but initialize it inside the route for Vercel efficiency
 bot_app = Application.builder().token(TOKEN).build()
 
 # Add Handlers
 bot_app.add_handler(CommandHandler("start", start))
 bot_app.add_handler(CommandHandler("cat", cat))
-bot_app.add_handler(CallbackQueryHandler(cat, pattern="^cat_"))
 bot_app.add_handler(CommandHandler("joke", joke))
 bot_app.add_handler(CallbackQueryHandler(joke_reveal, pattern="^joke_"))
+bot_app.add_handler(CommandHandler("math", math_start))
+bot_app.add_handler(CallbackQueryHandler(math_start, pattern="^math_start$"))
+bot_app.add_handler(CallbackQueryHandler(math_check, pattern="^math_ans_"))
 bot_app.add_handler(CommandHandler("rps", rps_start))
 bot_app.add_handler(CallbackQueryHandler(rps_play, pattern="^rps_"))
 
@@ -184,11 +260,8 @@ async def webhook():
     """Handle incoming Telegram updates via Webhook"""
     if request.method == "POST":
         await bot_app.initialize()
-        # Decode the update
         update = Update.de_json(request.get_json(force=True), bot_app.bot)
-        # Process the update
         await bot_app.process_update(update)
-        # Shutdown to save resources in serverless environment
         await bot_app.shutdown()
         
         return "OK", 200
