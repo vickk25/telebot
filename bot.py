@@ -1,128 +1,107 @@
-#!/usr/bin/env python
-# pylint: disable=unused-argument
-# This program is dedicated to the public domain under the CC0 license.
-
-"""
-Simple Bot to reply to Telegram messages.
-
-First, a few handler functions are defined. Then, those functions are passed to
-the Application and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-
-Usage:
-Basic Echobot example, repeats messages.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
-
+import os
+import logging
 import asyncio
-
-import requests
-
-from telegram import *
-from telegram.ext import *
-from random import *
 import random
-import flask
-
-
-app = flask.Flask(__name__)
-
-WEBHOOK_URL = 'https://telebot-sepia.vercel.app/'
-TOKEN = "8227179644:AAGd2SegWXWiMZ0KlYKhYtI5npopw6n12Vs"
-
-telebot = (
-    Application.builder()
-    .token(TOKEN)
-    .build()
+import requests
+from flask import Flask, request
+from telegram import (
+    Update, 
+    InlineKeyboardButton, 
+    InlineKeyboardMarkup, 
+    ReplyKeyboardMarkup, 
+)
+from telegram.ext import (
+    Application, 
+    CommandHandler, 
+    CallbackQueryHandler, 
+    ContextTypes
 )
 
+# 1. Logging Setup (Helps debug issues)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
+# 2. Configuration
+TOKEN = os.getenv("BOT_TOKEN", "8535828230:AAF71_itHUM4_SzdLXUdneTUCgm_Ba69444") 
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://telebot-sepia.vercel.app/")
 
-# Define a few command handlers. These usually take the two arguments update and
-# context.
+app = Flask(__name__)
+
+# 3. Bot Logic Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
-    # menu = [
-    #     [InlineKeyboardButton("Random Cat image", callback_data='cat')],
-    #     [InlineKeyboardButton("Random Joke", callback_data="joke")],
-    #     [InlineKeyboardButton("Rock Paper Scissors", callback_data="rps")] 
-    #     ]
-    
     user = update.effective_user
-    # await update.message.reply_html(
-    #     rf"Hi {user.mention_html()}! Choose a function:",
-    #     # reply_markup= InlineKeyboardMarkup(menu)
-    #     reply_markup=ForceReply(selective=True),
-    # )
-
+    
+    # Persistent keyboard (at the bottom of chat)
     reply_keyboard = [
         ['/joke', '/cat'],
         ['/rps']
     ]
-    markup_request = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
+    markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
     await update.message.reply_html(
         f"Hi {user.mention_html()}! Choose a function 👇",
-        reply_markup=markup_request,
-    ) 
-
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == 'cat':
-        await query.edit_message_media(f'Here is a random cat image: {cat}')
-
-    elif query.data == 'joke':
-        await query.edit_message_text(f'Here is a random joke: {joke}')
-
-    elif query.data == 'rps':
-        await query.edit_message_text({rps_play})
+        reply_markup=markup,
+    )
 
 async def cat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends random cat image."""
-    url = "https://api.thecatapi.com/v1/images/search"
-    resp = requests.get(url)
-    resp.raise_for_status()
-    data = resp.json()
-    cat_image_url = data[0]["url"]
+    try:
+        url = "https://api.thecatapi.com/v1/images/search"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        cat_image_url = data[0]["url"]
 
-    #await update.message.reply_photo(photo=cat_image_url)
-
-    if update.message:
-       await update.message.reply_photo(photo=cat_image_url)
-    elif update.callback_query:
-       await update.callback_query.answer()
-       await update.callback_query.message.reply_photo(photo=cat_image_url)
-
+        # Handle both command calls and callback queries
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_photo(photo=cat_image_url)
+        elif update.message:
+            await update.message.reply_photo(photo=cat_image_url)
+            
+    except Exception as e:
+        logger.error(f"Error fetching cat: {e}")
+        text = "Sorry, couldn't find a cat right now."
+        if update.callback_query:
+            await update.callback_query.message.reply_text(text)
+        else:
+            await update.message.reply_text(text)
 
 async def joke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    url = "https://official-joke-api.appspot.com/random_joke"
+    """Fetches a random joke setup."""
+    try:
+        url = "https://official-joke-api.appspot.com/random_joke"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
 
-    resp = requests.get(url)
-    resp.raise_for_status()
-    data = resp.json()
+        setup_text = data["setup"]
+        punchline = data["punchline"]
 
-    message = data["setup"]
-    keyboard = [
-        [InlineKeyboardButton("Reveal", callback_data=f"joke_{data['punchline']}")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        # Note: Callback data has a 64-byte limit. Long punchlines might fail here.
+        # Ideally, store the ID and fetch later, but for simple bots, this works if short.
+        keyboard = [[InlineKeyboardButton("Reveal", callback_data=f"joke_{punchline}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(message, reply_markup=reply_markup)
+        await update.message.reply_text(setup_text, reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"Error fetching joke: {e}")
+        await update.message.reply_text("Failed to fetch a joke.")
 
-
-async def joke_callback_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def joke_reveal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reveals the punchline."""
     query = update.callback_query
     await query.answer()
+    
+    # Extract punchline from callback_data (format: "joke_PUNCHLINE")
+    punchline = query.data.split("joke_", 1)[1]
+    await query.edit_message_text(punchline)
 
-    punchline = query.data
-    await query.edit_message_text(punchline.strip("joke_"))
-
-
+# --- Rock Paper Scissors Logic ---
 def get_winner(user_choice: str, bot_choice: str) -> str:
     if user_choice == bot_choice:
         return "tie"
@@ -134,7 +113,6 @@ def get_winner(user_choice: str, bot_choice: str) -> str:
         return "user"
     return "bot"
 
-
 async def rps_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -144,35 +122,35 @@ async def rps_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("✂️ Scissors", callback_data="rps_scissors")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(
         "👊 **Rock Paper Scissors** 👊\nChoose!",
-        reply_markup=reply_markup,
-        parse_mode="Markdown",
+        reply_markup=reply_markup
     )
 
-
 async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    EMOJIS = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
     query = update.callback_query
     await query.answer()
 
     user_choice = query.data.split("_")[1]
     bot_choice = random.choice(["rock", "paper", "scissors"])
     winner = get_winner(user_choice, bot_choice)
-
+    
+    emojis = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
+    
+    result_text = "🤝 TIE!"
     if winner == "user":
-        result = "🎉 YOU WIN!"
+        result_text = "🎉 YOU WIN!"
     elif winner == "bot":
-        result = "😈 BOT WINS!"
-    else:
-        result = "🤝 TIE!"
+        result_text = "😈 BOT WINS!"
+
     text = (
-        f"{EMOJIS[user_choice]} **You:** {user_choice.title()}\n"
-        f"{EMOJIS[bot_choice]} **Bot:** {bot_choice.title()}\n\n"
-        f"{result}\n"
+        f"{emojis[user_choice]} **You:** {user_choice.title()}\n"
+        f"{emojis[bot_choice]} **Bot:** {bot_choice.title()}\n\n"
+        f"{result_text}\n"
         f"🔄 Play again?"
     )
+    
+    # Re-use the same keyboard for replay
     keyboard = [
         [
             InlineKeyboardButton("🪨 Rock", callback_data="rps_rock"),
@@ -182,41 +160,43 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await query.edit_message_text(
-        text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"
+        text, 
+        reply_markup=InlineKeyboardMarkup(keyboard), 
     )
 
+# 4. Initialize Application
+# We create a global bot app but initialize it inside the route for Vercel efficiency
+bot_app = Application.builder().token(TOKEN).build()
+
+# Add Handlers
+bot_app.add_handler(CommandHandler("start", start))
+bot_app.add_handler(CommandHandler("cat", cat))
+bot_app.add_handler(CallbackQueryHandler(cat, pattern="^cat_"))
+bot_app.add_handler(CommandHandler("joke", joke))
+bot_app.add_handler(CallbackQueryHandler(joke_reveal, pattern="^joke_"))
+bot_app.add_handler(CommandHandler("rps", rps_start))
+bot_app.add_handler(CallbackQueryHandler(rps_play, pattern="^rps_"))
+
+
+# 5. Flask Routes (For Vercel/Webhooks)
 @app.route('/', methods=['GET', 'POST'])
 async def webhook():
-    """Handle incoming Telegram updates"""
-    if flask.request.method == "POST":
-        await telebot.initialize()
-        update = Update.de_json(flask.request.get_json(force=True), telebot.bot)
-        await telebot.process_update(update)
-
+    """Handle incoming Telegram updates via Webhook"""
+    if request.method == "POST":
+        await bot_app.initialize()
+        # Decode the update
+        update = Update.de_json(request.get_json(force=True), bot_app.bot)
+        # Process the update
+        await bot_app.process_update(update)
+        # Shutdown to save resources in serverless environment
+        await bot_app.shutdown()
+        
         return "OK", 200
-    else:
-        return "Hello", 200
-
-async def setup_webhook():
-    """Set the webhook with Telegram on startup"""
-    async with telebot:
-        await telebot.bot.set_webhook(url=WEBHOOK_URL)
-        print(f"Webhook set to {WEBHOOK_URL}")
+    return "Bot is running!", 200
 
 
-
-
-def main() -> None:
-    """Start the bot."""
-
-    asyncio.run(setup_webhook())
-    telebot.add_handler(CommandHandler("start", start))
-    telebot.add_handler(CallbackQueryHandler(button_callback))
-    telebot.add_handler(CommandHandler("cat", cat))
-    telebot.add_handler(CallbackQueryHandler(cat, pattern="^cat_"))
-    telebot.add_handler(CommandHandler("joke", joke))
-    telebot.add_handler(CallbackQueryHandler(joke_callback_handler, pattern="^joke_"))
-    telebot.add_handler(CommandHandler("rps", rps_start))
-    telebot.add_handler(CallbackQueryHandler(rps_play, pattern="^rps_"))
-
-main()
+# 6. Execution Logic
+if __name__ == "__main__":
+    # Local Development: Use Polling
+    print("Starting bot in POLLING mode...")
+    bot_app.run_polling()
