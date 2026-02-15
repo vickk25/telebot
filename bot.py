@@ -242,7 +242,7 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def dice_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Rolls a 6-sided die."""
     result = random.randint(1, 6)
-    keyboard = [[InlineKeyboardButton("Roll Again 🎲", callback_data="roll_dice")]]
+    keyboard = [[InlineKeyboardButton("Roll Again 🎲", callback_data="dice_roll")]]
     await update.message.reply_text(f"🎲 You rolled a {result}!", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
