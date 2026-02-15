@@ -239,14 +239,6 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard), 
     )
 
-async def dice_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Rolls a 6-sided die."""
-    result = random.randint(1, 6)
-    keyboard = [[InlineKeyboardButton("Roll Again 🎲", callback_data="roll_dice")]]
-    await update.message.reply_text(f"🎲 You rolled a {result}!", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-
 # 4. Initialize Application
 bot_app = Application.builder().token(TOKEN).build()
 
@@ -260,8 +252,6 @@ bot_app.add_handler(CallbackQueryHandler(math_start, pattern="^math_start$"))
 bot_app.add_handler(CallbackQueryHandler(math_check, pattern="^math_ans_"))
 bot_app.add_handler(CommandHandler("rps", rps_start))
 bot_app.add_handler(CallbackQueryHandler(rps_play, pattern="^rps_"))
-bot_app.add_handler(CommandHandler("dice", dice_roll))
-bot_app.add_handler(CallbackQueryHandler(dice_roll, pattern="^roll_dice$"))
 
 
 # 5. Flask Routes (For Vercel/Webhooks)
