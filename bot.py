@@ -242,8 +242,16 @@ async def rps_play(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def dice_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Rolls a 6-sided die."""
     result = random.randint(1, 6)
-    keyboard = [[InlineKeyboardButton("Roll Again 🎲", callback_data="dice_roll")]]
+    keyboard = [[InlineKeyboardButton("Roll Again 🎲", callback_data="roll_dice")]]
     await update.message.reply_text(f"🎲 You rolled a {result}!", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def dice_roll_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback for rolling dice again."""
+    query = update.callback_query
+    await query.answer()
+    result = random.randint(1, 6)
+    keyboard = [[InlineKeyboardButton("Roll Again 🎲", callback_data="roll_dice")]]
+    await query.edit_message_text(f"🎲 You rolled a {result}!", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 
@@ -261,7 +269,7 @@ bot_app.add_handler(CallbackQueryHandler(math_check, pattern="^math_ans_"))
 bot_app.add_handler(CommandHandler("rps", rps_start))
 bot_app.add_handler(CallbackQueryHandler(rps_play, pattern="^rps_"))
 bot_app.add_handler(CommandHandler("dice", dice_roll))
-bot_app.add_handler(CallbackQueryHandler(dice_roll, pattern="^roll_dice$"))
+bot_app.add_handler(CallbackQueryHandler(dice_roll_callback, pattern="^roll_dice$"))    
 
 
 # 5. Flask Routes (For Vercel/Webhooks)
