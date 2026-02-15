@@ -40,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Persistent keyboard (at the bottom of chat)
     reply_keyboard = [
         ['/joke', '/cat'],
-        ['/rps', '/math']
+        ['/rps', '/math', '/dice']
     ]
     markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
